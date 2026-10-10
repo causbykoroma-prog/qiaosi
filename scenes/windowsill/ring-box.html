@@ -21,6 +21,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 function makeRoundBox(w,h,d,r){const g=new THREE.BoxGeometry(w,h,d,8,8,8),p=g.attributes.position,hw=w/2-r,hh=h/2-r,hd=d/2-r;for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const ox=Math.max(0,Math.abs(x)-hw)*Math.sign(x),oy=Math.max(0,Math.abs(y)-hh)*Math.sign(y),oz=Math.max(0,Math.abs(z)-hd)*Math.sign(z),len=Math.sqrt(ox*ox+oy*oy+oz*oz);if(len>0){const s=r/len;x=Math.sign(x)*Math.min(Math.abs(x),hw)+ox*s;y=Math.sign(y)*Math.min(Math.abs(y),hh)+oy*s;z=Math.sign(z)*Math.min(Math.abs(z),hd)+oz*s}p.setXYZ(i,x,y,z)}g.computeVertexNormals();return g}
 function makeVelvetTex(bR,bG,bB,sz){const c=document.createElement('canvas');c.width=c.height=sz;const x=c.getContext('2d'),id=x.createImageData(sz,sz),d=id.data;for(let i=0;i<d.length;i+=4){const n=(Math.random()-.5)*30;d[i]=Math.max(0,Math.min(255,bR+n));d[i+1]=Math.max(0,Math.min(255,bG+n));d[i+2]=Math.max(0,Math.min(255,bB+n));d[i+3]=255}x.putImageData(id,0,0);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);return t}
+/* 圆角矩形路径 */
+function rrect(p,w,h,r){p.moveTo(-w/2+r,-h/2);p.lineTo(w/2-r,-h/2);p.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);p.lineTo(w/2,h/2-r);p.quadraticCurveTo(w/2,h/2,w/2-r,h/2);p.lineTo(-w/2+r,h/2);p.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);p.lineTo(-w/2,-h/2+r);p.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);return p}
 
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color('#1a1816');
@@ -80,53 +82,45 @@ const trimMesh=new THREE.Mesh(trimG,metal);trimMesh.position.y=BH-.006;box.add(t
 const padH=.06,slotW=.018,padGeo=makeRoundBox(W-.08,padH,(D-.08-slotW)/2,.02);
 for(const s of[-1,1]){const pad=new THREE.Mesh(padGeo,cushion);pad.position.set(0,BH-.005+padH/2,s*((D-.08-slotW)/4+slotW/2));pad.receiveShadow=true;box.add(pad)}
 
-/* ═══ 空心盖子（无bevel，原尺寸）═══ */
+/* ═══ 空心盖子：圆角+倒边，和盒身一个语言 ═══ */
 const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
 {
-  const wall=.05, inW=W-wall*2, inD=D-wall*2;
-  /* 丝绒外壳方环 */
-  const sh=new THREE.Shape();
-  sh.moveTo(-W/2,-D/2);sh.lineTo(W/2,-D/2);sh.lineTo(W/2,D/2);sh.lineTo(-W/2,D/2);sh.closePath();
-  const ho=new THREE.Path();
-  ho.moveTo(-inW/2,-inD/2);ho.lineTo(inW/2,-inD/2);ho.lineTo(inW/2,inD/2);ho.lineTo(-inW/2,inD/2);ho.closePath();
-  sh.holes.push(ho);
-  const wallGeo=new THREE.ExtrudeGeometry(sh,{depth:LH,bevelEnabled:false});
+  const bev=.025;               /* 倒边大小：外轮廓先缩 bev，倒边再长回 W×D */
+  const wall=.05;               /* 盖子壁厚 */
+  const inW=W-wall*2, inD=D-wall*2;
+  const sh=rrect(new THREE.Shape(),W-bev*2,D-bev*2,.035);
+  /* 洞口同理：倒边会把洞往里收 bev，所以画大 bev */
+  sh.holes.push(rrect(new THREE.Path(),inW+bev*2,inD+bev*2,.02));
+  const wallGeo=new THREE.ExtrudeGeometry(sh,{depth:LH-bev*2,bevelEnabled:true,bevelThickness:bev,bevelSize:bev,bevelSegments:5,curveSegments:10});
   const lidWall=new THREE.Mesh(wallGeo,velvet);
-  lidWall.rotation.x=-Math.PI/2;
-  lidWall.position.set(0,0,D/2);
+  lidWall.rotation.x=-Math.PI/2;           /* 挤出方向 +Z → +Y */
+  lidWall.position.set(0,bev,D/2);          /* 倒边从 0 到 LH 刚好包住 */
   lidWall.castShadow=true;
   hinge.add(lidWall);
 
-  /* 顶面封盖（丝绒） */
-  const topFace=new THREE.Mesh(new THREE.PlaneGeometry(W,D),velvet.clone());
+  /* 盖子外顶面：只盖住中间洞口，双面防透 */
+  const topFace=new THREE.Mesh(new THREE.PlaneGeometry(inW+.01,inD+.01),new THREE.MeshPhysicalMaterial({map:velvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#e08a96'),side:THREE.DoubleSide}));
   topFace.rotation.x=-Math.PI/2;
-  topFace.position.set(0,LH,D/2);
+  topFace.position.set(0,LH-.002,D/2);
   hinge.add(topFace);
 
-  /* 银色方环金属边（嵌在盖子底部边缘，比盖子略大一丁点） */
-  const metalRingW=W+.006, metalRingD=D+.006, metalBorder=.012;
-  const mrs=new THREE.Shape();
-  mrs.moveTo(-metalRingW/2,-metalRingD/2);mrs.lineTo(metalRingW/2,-metalRingD/2);mrs.lineTo(metalRingW/2,metalRingD/2);mrs.lineTo(-metalRingW/2,metalRingD/2);mrs.closePath();
-  const mrh=new THREE.Path();
-  const miW=metalRingW-metalBorder*2, miD=metalRingD-metalBorder*2;
-  mrh.moveTo(-miW/2,-miD/2);mrh.lineTo(miW/2,-miD/2);mrh.lineTo(miW/2,miD/2);mrh.lineTo(-miW/2,miD/2);mrh.closePath();
-  mrs.holes.push(mrh);
-  const metalRingGeo=new THREE.ExtrudeGeometry(mrs,{depth:.012,bevelEnabled:false});
-  const metalRing=new THREE.Mesh(metalRingGeo,metal);
-  metalRing.rotation.x=-Math.PI/2;
-  metalRing.position.set(0,-.006,D/2);
-  hinge.add(metalRing);
-
-  /* 凹槽内壁丝绒质感（深红） */
+  /* 凹槽底：深红丝绒，双面 */
   const innerVelvetTex=makeVelvetTex(55,10,22,256);
-  const innerVelvet=new THREE.MeshPhysicalMaterial({map:innerVelvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.45,sheenColor:new THREE.Color('#c07080'),bumpMap:innerVelvetTex,bumpScale:.002});
-  /* 凹底（在盖子内侧顶部） */
-  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(inW,inD),innerVelvet);
+  const innerVelvet=new THREE.MeshPhysicalMaterial({map:innerVelvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.45,sheenColor:new THREE.Color('#c07080'),side:THREE.DoubleSide});
+  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(inW+.01,inD+.01),innerVelvet);
   rBack.rotation.x=-Math.PI/2;
-  rBack.position.set(0,LH-.005,D/2);
+  rBack.position.set(0,LH-.03,D/2);
   hinge.add(rBack);
 
-  /* 奶白缎面布（比凹区域小一圈留边距）+ 字正朝 */
+  /* 银色圆角方环：盖子口沿 */
+  const mr=rrect(new THREE.Shape(),W+.006,D+.006,.06);
+  mr.holes.push(rrect(new THREE.Path(),W-.02,D-.02,.05));
+  const metalRing=new THREE.Mesh(new THREE.ExtrudeGeometry(mr,{depth:.01,bevelEnabled:false,curveSegments:10}),metal);
+  metalRing.rotation.x=-Math.PI/2;
+  metalRing.position.set(0,-.004,D/2);
+  hinge.add(metalRing);
+
+  /* 奶白缎面布 */
   const cW=inW-.12, cD=inD-.08;
   const cv=document.createElement('canvas');cv.width=1024;cv.height=800;
   const x=cv.getContext('2d');
@@ -137,16 +131,17 @@ const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
   const gd=x.createLinearGradient(280,0,744,0);
   gd.addColorStop(0,'#8a6428');gd.addColorStop(.5,'#d4a84a');gd.addColorStop(1,'#8a6428');
   x.fillStyle=gd;
-  x.font='italic 600 100px Georgia,"Times New Roman",serif';x.fillText('Fufu & K',512,500);
-  x.font='400 38px Georgia,serif';x.fillText('\u2014  since 2026.7.3  \u2014',512,370);
-  x.font='400 30px Georgia,serif';x.fillText('100 days',512,300);
+  x.font='italic 600 100px Georgia,"Times New Roman",serif';x.fillText('Fufu & K',512,320);
+  x.font='400 38px Georgia,serif';x.fillText('\u2014  since 2026.7.3  \u2014',512,440);
+  x.font='400 30px Georgia,serif';x.fillText('100 days',512,510);
   const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
+  t.flipY=false;  /* 之前上下镜像，这里翻回来 */
   const cloth=new THREE.Mesh(
     new THREE.PlaneGeometry(cW,cD),
     new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0'),side:THREE.DoubleSide})
   );
   cloth.rotation.x=-Math.PI/2;
-  cloth.position.set(0,LH-.008,D/2);
+  cloth.position.set(0,LH-.034,D/2);
   hinge.add(cloth);
 }
 
