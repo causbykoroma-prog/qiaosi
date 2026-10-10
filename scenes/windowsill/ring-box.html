@@ -69,6 +69,7 @@ function buildRing(){
 const W=1.0,D=.9,BH=.42,LH=.26;
 const velvetTex=makeVelvetTex(74,15,30,256);
 const velvet=new THREE.MeshPhysicalMaterial({map:velvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#e08a96'),bumpMap:velvetTex,bumpScale:.003});
+const velvetDS=new THREE.MeshPhysicalMaterial({map:velvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#e08a96'),bumpMap:velvetTex,bumpScale:.003,side:THREE.DoubleSide});
 const cushionTex=makeVelvetTex(94,21,39,256);
 const cushion=new THREE.MeshPhysicalMaterial({map:cushionTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#f0a0b0'),bumpMap:cushionTex,bumpScale:.003});
 
@@ -80,47 +81,68 @@ const trimMesh=new THREE.Mesh(trimG,metal);trimMesh.position.y=BH-.006;box.add(t
 const padH=.06,slotW=.018,padGeo=makeRoundBox(W-.08,padH,(D-.08-slotW)/2,.02);
 for(const s of[-1,1]){const pad=new THREE.Mesh(padGeo,cushion);pad.position.set(0,BH-.005+padH/2,s*((D-.08-slotW)/4+slotW/2));pad.receiveShadow=true;box.add(pad)}
 
-/* ═══ 盖子：makeRoundBox外壳 + 填充块做凹槽 ═══ */
+/* ═══ 盖子：顶面+四壁（无底面）+ 填充块凹槽 + 布 ═══
+   hinge坐标：y=0是盖子底边(合上时贴着盒身顶面)，y=LH是盖子顶面。
+   盖子中心在 z=D/2。
+   不用实心makeRoundBox了，手动拼五个面，底面敞开。 */
 const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
 {
-  /* 盖子外壳 */
-  const lid=new THREE.Mesh(makeRoundBox(W,LH,D,.06),velvet);
-  lid.position.set(0,LH/2,D/2);
-  lid.castShadow=true;
-  hinge.add(lid);
+  const cz=D/2; /* 盖子中心z */
 
-  /* 金属边（跟底部一样） */
+  /* 顶面：水平面，朝上 */
+  const topG=new THREE.PlaneGeometry(W,D);
+  const top=new THREE.Mesh(topG,velvetDS);
+  top.rotation.x=-Math.PI/2;
+  top.position.set(0,LH,cz);
+  top.castShadow=true;
+  hinge.add(top);
+
+  /* 四壁：竖直面，双面渲染 */
+  /* 后壁 (z小的那面) */
+  const backW=new THREE.Mesh(new THREE.PlaneGeometry(W,LH),velvetDS);
+  backW.position.set(0,LH/2,cz-D/2);
+  hinge.add(backW);
+  /* 前壁 (z大的那面) */
+  const frontW=new THREE.Mesh(new THREE.PlaneGeometry(W,LH),velvetDS);
+  frontW.rotation.y=Math.PI;
+  frontW.position.set(0,LH/2,cz+D/2);
+  hinge.add(frontW);
+  /* 左壁 */
+  const leftW=new THREE.Mesh(new THREE.PlaneGeometry(D,LH),velvetDS);
+  leftW.rotation.y=Math.PI/2;
+  leftW.position.set(-W/2,LH/2,cz);
+  hinge.add(leftW);
+  /* 右壁 */
+  const rightW=new THREE.Mesh(new THREE.PlaneGeometry(D,LH),velvetDS);
+  rightW.rotation.y=-Math.PI/2;
+  rightW.position.set(W/2,LH/2,cz);
+  hinge.add(rightW);
+
+  /* 金属边 */
   const lidTrim=new THREE.Mesh(trimG.clone(),metal);
-  lidTrim.position.set(0,.002,D/2);
+  lidTrim.position.set(0,.002,cz);
   hinge.add(lidTrim);
 
-  /* 填充块：比盖子每边缩 wall，高度 = LH - recess
-     从盖子顶部往下填，底面留出 recess 深的凹槽 */
-  const wall=.07, recess=.09;
+  /* 填充块：从顶部往下填，留出 recess 深的凹槽 */
+  const wall=.07, recess=.08;
   const fillW=W-wall*2, fillD=D-wall*2, fillH=LH-recess;
-  const fill=new THREE.Mesh(makeRoundBox(fillW,fillH,fillD,.04),velvet);
-  fill.position.set(0,recess+fillH/2,D/2);
+  const fill=new THREE.Mesh(makeRoundBox(fillW,fillH,fillD,.03),velvet);
+  fill.position.set(0,recess+fillH/2,cz);
   hinge.add(fill);
 
   /* 凹槽底面：深红丝绒 */
-  const innerVelvetTex=makeVelvetTex(55,10,22,256);
-  const innerVelvet=new THREE.MeshPhysicalMaterial({map:innerVelvetTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.45,sheenColor:new THREE.Color('#c07080'),bumpMap:innerVelvetTex,bumpScale:.002,side:THREE.DoubleSide});
-  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(fillW+.01,fillD+.01),innerVelvet);
-  rBack.rotation.x=Math.PI/2;
-  rBack.position.set(0,recess-.002,D/2);
+  const innerVTex=makeVelvetTex(55,10,22,256);
+  const innerV=new THREE.MeshPhysicalMaterial({map:innerVTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.45,sheenColor:new THREE.Color('#c07080'),bumpMap:innerVTex,bumpScale:.002,side:THREE.DoubleSide});
+  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(fillW+.01,fillD+.01),innerV);
+  rBack.rotation.x=Math.PI/2;  /* 正面朝-y，即朝下=翻开后朝观众 */
+  rBack.position.set(0,recess-.002,cz);
   hinge.add(rBack);
 
-  /* 奶白缎面布 + 烫金字
-     布比凹槽再小一圈，贴在凹底上。
-     正面朝 -y（rotation.x = Math.PI/2），翻开后正对观众。
-     canvas 画字时翻转（scale -1,1 + 上下反排），
-     这样经过 PlaneGeometry 默认UV + rotation 后字就正了。 */
-  const cW=fillW-.08, cD=fillD-.06;
+  /* 奶白缎面布 + 烫金字 */
+  const cW=fillW-.06, cD=fillD-.04;
   const cv=document.createElement('canvas');cv.width=1024;cv.height=800;
   const x=cv.getContext('2d');
-  /* 先水平翻转整个 canvas */
-  x.translate(1024,0);
-  x.scale(-1,1);
+  x.translate(1024,0);x.scale(-1,1);  /* 水平翻转 */
   const gr=x.createRadialGradient(512,400,40,512,400,580);
   gr.addColorStop(0,'#faf6f0');gr.addColorStop(1,'#ede4d8');
   x.fillStyle=gr;x.fillRect(0,0,1024,800);
@@ -128,7 +150,6 @@ const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
   const gd=x.createLinearGradient(280,0,744,0);
   gd.addColorStop(0,'#8a6428');gd.addColorStop(.5,'#d4a84a');gd.addColorStop(1,'#8a6428');
   x.fillStyle=gd;
-  /* 上下也反排：canvas底部画大字（翻转后变成顶部=盖子翻开后上方） */
   x.font='italic 600 100px Georgia,"Times New Roman",serif';x.fillText('Fufu & K',512,550);
   x.font='400 38px Georgia,serif';x.fillText('\u2014  since 2026.7.3  \u2014',512,400);
   x.font='400 30px Georgia,serif';x.fillText('100 days',512,310);
@@ -138,7 +159,7 @@ const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
     new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0'),side:THREE.DoubleSide})
   );
   cloth.rotation.x=Math.PI/2;
-  cloth.position.set(0,recess-.001,D/2);
+  cloth.position.set(0,recess-.001,cz);
   hinge.add(cloth);
 }
 
