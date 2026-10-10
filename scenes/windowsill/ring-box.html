@@ -41,6 +41,26 @@ function makeRoundBox(w, h, d, r) {
   return g;
 }
 
+/* 生成丝绒噪点纹理 */
+function makeVelvetTex(baseR, baseG, baseB, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d');
+  const id = x.createImageData(size, size), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - .5) * 30;
+    d[i] = Math.max(0, Math.min(255, baseR + n));
+    d[i+1] = Math.max(0, Math.min(255, baseG + n));
+    d[i+2] = Math.max(0, Math.min(255, baseB + n));
+    d[i+3] = 255;
+  }
+  x.putImageData(id, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  return t;
+}
+
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -124,21 +144,23 @@ function buildRing() {
     for (const zz of [-1, 1]) { const b = new THREE.Mesh(new THREE.SphereGeometry(.0042, 10, 6), metal); const t2 = th + sd * .036; b.position.set(Math.cos(t2) * (rO + .002), Math.sin(t2) * (rO + .002), zz * .012 * f); rg.add(b); }
   }
 
-  /* 内侧刻字：不透明金属底色 + 亮白刻痕 */
+  /* 内侧刻字：不透明金属底 + 亮白刻痕
+     修正：戒圈宽方向拉了1.25倍，所以贴图canvas宽度也要按比例缩窄字，
+     让最终贴到弯曲面上以后看起来是正常比例 */
   const TXT = 'Fufu  \u2661  K  \u00b7  2026.7.3';
-  const cvs = document.createElement('canvas'); cvs.width = 2048; cvs.height = 128;
+  const cvs = document.createElement('canvas'); cvs.width = 2048; cvs.height = 160;
   const cx = cvs.getContext('2d');
-  /* 先铺一层和戒圈内壁接近的金属底色，不透明 */
-  cx.fillStyle = '#b0afae'; cx.fillRect(0, 0, 2048, 128);
-  cx.font = '700 78px Georgia,"Times New Roman",serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillStyle = '#b0afae'; cx.fillRect(0, 0, 2048, 160);
+  /* 横向缩0.8倍补偿戒圈宽方向的1.25倍拉伸 */
+  cx.save(); cx.translate(0, 0); cx.scale(0.8, 1);
+  cx.font = '700 90px Georgia,"Times New Roman",serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
   for (const u of [.25, .75]) {
-    /* 刻痕凹进去的阴影（稍微偏一点，模拟深度） */
-    cx.fillStyle = '#707070'; cx.fillText(TXT, 2048 * u + 1, 66);
-    /* 刻痕本身：亮白色，像金属被刮开露出来的亮面 */
-    cx.fillStyle = '#ffffff'; cx.fillText(TXT, 2048 * u, 64);
+    cx.fillStyle = '#707070'; cx.fillText(TXT, 2048 * u / 0.8 + 1, 82);
+    cx.fillStyle = '#ffffff'; cx.fillText(TXT, 2048 * u / 0.8, 80);
   }
+  cx.restore();
   const tx = new THREE.CanvasTexture(cvs); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8; tx.wrapS = THREE.RepeatWrapping; tx.repeat.x = -1;
-  const ig = new THREE.CylinderGeometry(R, R, .032, 256, 1, true); ig.rotateX(Math.PI / 2);
+  const ig = new THREE.CylinderGeometry(R, R, .036, 256, 1, true); ig.rotateX(Math.PI / 2);
   const ip = ig.attributes.position;
   for (let i = 0; i < ip.count; i++) { const x0 = ip.getX(i), y0 = ip.getY(i), z0 = ip.getZ(i), th = Math.atan2(y0, x0), f = thick(th), a = 1.25 * f * TUBE, k = Math.sqrt(Math.max(0, 1 - (z0 / a) ** 2)), r = R - .78 * f * TUBE * k - .001; ip.setXYZ(i, Math.cos(th) * r, Math.sin(th) * r, z0); }
   ig.computeVertexNormals();
@@ -150,8 +172,20 @@ function buildRing() {
 }
 
 const W = 1.0, D = .9, BH = .42, LH = .26;
-const velvet = new THREE.MeshPhysicalMaterial({color: '#4a0f1e', roughness: .92, sheen: 1, sheenRoughness: .45, sheenColor: new THREE.Color('#e08a96')});
-const cushion = velvet.clone(); cushion.color = new THREE.Color('#5e1527');
+
+/* 丝绒材质：噪点贴图 + sheen */
+const velvetTex = makeVelvetTex(74, 15, 30, 256);
+const velvet = new THREE.MeshPhysicalMaterial({
+  map: velvetTex, color: '#ffffff', roughness: .95,
+  sheen: 1, sheenRoughness: .4, sheenColor: new THREE.Color('#e08a96'),
+  bumpMap: velvetTex, bumpScale: .003
+});
+const cushionTex = makeVelvetTex(94, 21, 39, 256);
+const cushion = new THREE.MeshPhysicalMaterial({
+  map: cushionTex, color: '#ffffff', roughness: .95,
+  sheen: 1, sheenRoughness: .4, sheenColor: new THREE.Color('#f0a0b0'),
+  bumpMap: cushionTex, bumpScale: .003
+});
 
 const box = new THREE.Group(); scene.add(box);
 
