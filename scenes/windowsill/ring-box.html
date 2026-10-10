@@ -84,69 +84,77 @@ const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
 const lid=new THREE.Mesh(makeRoundBox(W,LH,D,.06),velvet);lid.position.set(0,LH/2,D/2);lid.castShadow=true;hinge.add(lid);
 const lidTrimMesh=new THREE.Mesh(trimG.clone(),metal);lidTrimMesh.position.set(0,.002,D/2);hinge.add(lidTrimMesh);
 
-/* ═══ 盖子内凹：方环边框(丝绒) + 凹底(深色) + 布(奶白) ═══
-   hinge坐标系里：lid底面在 y=0，lid中心在 y=LH/2
-   方环贴在 y=0 朝下（面朝开盒方向），用 ExtrudeGeometry 给它厚度做出凹陷深度 */
+/* ═══ 盖子内凹：方环边框 ═══
+   hinge坐标：lid在 y=[0, LH], 中心z=D/2
+   lid底面 = y=0
+   方环从 y=0.005(稍微离开金属边避免z-fighting) 往 y=+depth 挤出
+   ExtrudeGeometry 默认沿 +Z 挤出
+   所以 shape 画在 XY 平面，挤出后旋转让 Z→Y */
 {
-  const frameW=W-.02, frameD=D-.02;  /* 方环外尺寸，略小于盖子 */
-  const border=.08;                   /* 边框宽度 */
-  const holeW=frameW-border*2, holeD=frameD-border*2;  /* 挖洞尺寸 */
-  const depth=.045;                   /* 凹进去的深度 */
+  const frameW = W - .14;    /* 比盖子小很多，不碰圆角 */
+  const frameD = D - .14;
+  const border = .07;        /* 边框宽度 */
+  const holeW = frameW - border * 2;
+  const holeD = frameD - border * 2;
+  const depth = .04;
 
-  /* Shape: 外框矩形，挖一个内框洞 */
-  const shape=new THREE.Shape();
-  shape.moveTo(-frameW/2,-frameD/2);
-  shape.lineTo(frameW/2,-frameD/2);
-  shape.lineTo(frameW/2,frameD/2);
-  shape.lineTo(-frameW/2,frameD/2);
+  const shape = new THREE.Shape();
+  shape.moveTo(-frameW/2, -frameD/2);
+  shape.lineTo( frameW/2, -frameD/2);
+  shape.lineTo( frameW/2,  frameD/2);
+  shape.lineTo(-frameW/2,  frameD/2);
   shape.closePath();
-  const hole=new THREE.Path();
-  hole.moveTo(-holeW/2,-holeD/2);
-  hole.lineTo(holeW/2,-holeD/2);
-  hole.lineTo(holeW/2,holeD/2);
-  hole.lineTo(-holeW/2,holeD/2);
+  const hole = new THREE.Path();
+  hole.moveTo(-holeW/2, -holeD/2);
+  hole.lineTo( holeW/2, -holeD/2);
+  hole.lineTo( holeW/2,  holeD/2);
+  hole.lineTo(-holeW/2,  holeD/2);
   hole.closePath();
   shape.holes.push(hole);
 
-  const frameGeo=new THREE.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:false});
-  const frameTex=makeVelvetTex(60,12,25,256);
-  const frameMat=new THREE.MeshPhysicalMaterial({map:frameTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#d08090'),bumpMap:frameTex,bumpScale:.002});
-  const frame=new THREE.Mesh(frameGeo,frameMat);
-  /* 放到盖子内壁：旋转让挤出方向朝 +y（进入盖子），位置贴在 y=0 */
-  frame.rotation.x=-Math.PI/2;
-  frame.position.set(0,0,D/2);
+  const frameGeo = new THREE.ExtrudeGeometry(shape, {depth: depth, bevelEnabled: false});
+  const frameTex = makeVelvetTex(60, 12, 25, 256);
+  const frameMat = new THREE.MeshPhysicalMaterial({map:frameTex,color:'#ffffff',roughness:.95,sheen:1,sheenRoughness:.4,sheenColor:new THREE.Color('#d08090'),bumpMap:frameTex,bumpScale:.002});
+  const frame = new THREE.Mesh(frameGeo, frameMat);
+  /* Extrude默认沿+Z → 旋转让+Z变+Y(进入盖子内部) */
+  frame.rotation.x = -Math.PI / 2;
+  /* 放到lid底面：y=0.005(避开金属边)，z=D/2(盖子中心) */
+  /* 旋转后：原shape的XY平面变成XZ，原+Z(挤出)变成-Y → 不对 */
+  /* rotation.x=-PI/2: 原(x,y,z)→(x,-z,y) 所以+Z→+Y ✓ */
+  /* shape中心在(0,0)，挤出到z=depth，旋转后y从0到depth */
+  frame.position.set(0, .005, D/2);
   hinge.add(frame);
 
-  /* 凹底面：在方环洞里的最深处 */
-  const rBack=new THREE.Mesh(
-    new THREE.PlaneGeometry(holeW,holeD),
-    new THREE.MeshStandardMaterial({color:'#2a0a14',roughness:.95,side:THREE.DoubleSide})
+  /* 凹底：在方环洞里最深处 y=depth+0.005 */
+  const rBack = new THREE.Mesh(
+    new THREE.PlaneGeometry(holeW, holeD),
+    new THREE.MeshStandardMaterial({color:'#2a0a14', roughness:.95, side:THREE.DoubleSide})
   );
-  rBack.rotation.x=-Math.PI/2;
-  rBack.position.set(0,depth-.001,D/2);
+  rBack.rotation.x = -Math.PI / 2;
+  rBack.position.set(0, depth + .004, D/2);
   hinge.add(rBack);
 
-  /* 奶白缎面布（比洞口再小一点，留边距） */
-  const cW=holeW-.1,cD=holeD-.08;
-  const cv=document.createElement('canvas');cv.width=1024;cv.height=800;
-  const x=cv.getContext('2d');
-  const gr=x.createRadialGradient(512,380,40,512,400,600);
-  gr.addColorStop(0,'#faf6f0');gr.addColorStop(1,'#ede4d8');
-  x.fillStyle=gr;x.fillRect(0,0,1024,800);
-  x.textAlign='center';x.textBaseline='middle';
-  const gd=x.createLinearGradient(280,0,744,0);
-  gd.addColorStop(0,'#8a6428');gd.addColorStop(.5,'#d4a84a');gd.addColorStop(1,'#8a6428');
-  x.fillStyle=gd;
-  x.font='italic 600 100px Georgia,"Times New Roman",serif';x.fillText('Fufu & K',512,320);
-  x.font='400 38px Georgia,serif';x.fillText('\u2014  since 2026.7.3  \u2014',512,440);
-  x.font='400 30px Georgia,serif';x.fillText('100 days',512,510);
-  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
-  const cloth=new THREE.Mesh(
-    new THREE.PlaneGeometry(cW,cD),
-    new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0'),side:THREE.DoubleSide})
+  /* 奶白缎面布 */
+  const cW = holeW - .08, cD = holeD - .06;
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 800;
+  const x = cv.getContext('2d');
+  const gr = x.createRadialGradient(512,380,40,512,400,600);
+  gr.addColorStop(0,'#faf6f0'); gr.addColorStop(1,'#ede4d8');
+  x.fillStyle = gr; x.fillRect(0,0,1024,800);
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const gd = x.createLinearGradient(280,0,744,0);
+  gd.addColorStop(0,'#8a6428'); gd.addColorStop(.5,'#d4a84a'); gd.addColorStop(1,'#8a6428');
+  x.fillStyle = gd;
+  x.font = 'italic 600 100px Georgia,"Times New Roman",serif'; x.fillText('Fufu & K',512,320);
+  x.font = '400 38px Georgia,serif'; x.fillText('\u2014  since 2026.7.3  \u2014',512,440);
+  x.font = '400 30px Georgia,serif'; x.fillText('100 days',512,510);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const cloth = new THREE.Mesh(
+    new THREE.PlaneGeometry(cW, cD),
+    new THREE.MeshPhysicalMaterial({map:t, roughness:.3, sheen:.8, sheenColor:new THREE.Color('#fff8f0'), side:THREE.DoubleSide})
   );
-  cloth.rotation.x=-Math.PI/2;
-  cloth.position.set(0,depth-.003,D/2);
+  cloth.rotation.x = -Math.PI / 2;
+  cloth.position.set(0, depth + .003, D/2);
   hinge.add(cloth);
 }
 
