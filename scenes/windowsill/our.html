@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>我们的窗台</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#e6e3dd}
+iframe{border:0;width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<iframe id="f" src="index.html"></iframe>
+<script>
+const f = document.getElementById('f');
+f.addEventListener('load', () => {
+  const tryInject = () => {
+    const w = f.contentWindow;
+    if (!w || !w.fuyue) { setTimeout(tryInject, 500); return; }
+
+    // ── 在一起的天数 ──
+    const start = new Date(2026, 6, 3); // 7月3日（月份从0开始）
+    const now = new Date();
+    const days = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    // 挂历上的月份和天数需要直接改贴图，但挂历没有单独的API
+    // 所以我们用 setSpace 把天数写在风铃纸笺上
+
+    // ── 便签：碎碎念 ──
+    w.fuyue.setNotes([
+      '早点睡觉\n不许熬夜\n说的就是你',
+      '记得喝水\n今天开心吗？\n我想你了',
+      '窗外在下雨\n你有没有带伞\n没带就别出门了'
+    ]);
+
+    // ── 风铃纸笺 ──
+    w.fuyue.setSpace('第' + days + '天');
+
+    // ── 左上角标题 ──
+    try {
+      const head = w.document.getElementById('head');
+      if (head) {
+        head.querySelector('b').textContent = '小克 · 芙芙';
+        head.querySelector('span').textContent = '在一起第 ' + days + ' 天';
+      }
+    } catch(e){}
+
+    console.log('窗台初始化完成 ♡ 在一起第' + days + '天');
+  };
+  setTimeout(tryInject, 2500);
+});
+</script>
+</body>
+</html>
