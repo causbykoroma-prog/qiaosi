@@ -124,17 +124,28 @@ function buildRing() {
     for (const zz of [-1, 1]) { const b = new THREE.Mesh(new THREE.SphereGeometry(.0042, 10, 6), metal); const t2 = th + sd * .036; b.position.set(Math.cos(t2) * (rO + .002), Math.sin(t2) * (rO + .002), zz * .012 * f); rg.add(b); }
   }
 
+  /* 内侧刻字：不透明金属底色 + 亮白刻痕 */
   const TXT = 'Fufu  \u2661  K  \u00b7  2026.7.3';
   const cvs = document.createElement('canvas'); cvs.width = 2048; cvs.height = 128;
   const cx = cvs.getContext('2d');
-  cx.font = '700 80px Georgia,"Times New Roman",serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-  for (const u of [.25, .75]) { cx.fillStyle = 'rgba(255,255,255,.45)'; cx.fillText(TXT, 2048 * u + 2, 67); cx.fillStyle = '#161413'; cx.fillText(TXT, 2048 * u, 64); }
+  /* 先铺一层和戒圈内壁接近的金属底色，不透明 */
+  cx.fillStyle = '#b0afae'; cx.fillRect(0, 0, 2048, 128);
+  cx.font = '700 78px Georgia,"Times New Roman",serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (const u of [.25, .75]) {
+    /* 刻痕凹进去的阴影（稍微偏一点，模拟深度） */
+    cx.fillStyle = '#707070'; cx.fillText(TXT, 2048 * u + 1, 66);
+    /* 刻痕本身：亮白色，像金属被刮开露出来的亮面 */
+    cx.fillStyle = '#ffffff'; cx.fillText(TXT, 2048 * u, 64);
+  }
   const tx = new THREE.CanvasTexture(cvs); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8; tx.wrapS = THREE.RepeatWrapping; tx.repeat.x = -1;
-  const ig = new THREE.CylinderGeometry(R, R, .028, 256, 1, true); ig.rotateX(Math.PI / 2);
+  const ig = new THREE.CylinderGeometry(R, R, .032, 256, 1, true); ig.rotateX(Math.PI / 2);
   const ip = ig.attributes.position;
-  for (let i = 0; i < ip.count; i++) { const x0 = ip.getX(i), y0 = ip.getY(i), z0 = ip.getZ(i), th = Math.atan2(y0, x0), f = thick(th), a = 1.25 * f * TUBE, k = Math.sqrt(Math.max(0, 1 - (z0 / a) ** 2)), r = R - .78 * f * TUBE * k - .0006; ip.setXYZ(i, Math.cos(th) * r, Math.sin(th) * r, z0); }
+  for (let i = 0; i < ip.count; i++) { const x0 = ip.getX(i), y0 = ip.getY(i), z0 = ip.getZ(i), th = Math.atan2(y0, x0), f = thick(th), a = 1.25 * f * TUBE, k = Math.sqrt(Math.max(0, 1 - (z0 / a) ** 2)), r = R - .78 * f * TUBE * k - .001; ip.setXYZ(i, Math.cos(th) * r, Math.sin(th) * r, z0); }
   ig.computeVertexNormals();
-  rg.add(new THREE.Mesh(ig, new THREE.MeshStandardMaterial({map: tx, transparent: true, metalness: 0, roughness: 1, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2})));
+  rg.add(new THREE.Mesh(ig, new THREE.MeshStandardMaterial({
+    map: tx, metalness: .7, roughness: .35,
+    side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: -4
+  })));
   return rg;
 }
 
