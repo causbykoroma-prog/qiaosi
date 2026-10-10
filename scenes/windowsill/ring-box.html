@@ -79,39 +79,45 @@ const base=new THREE.Mesh(makeRoundBox(W,BH,D,.06),velvet);base.position.y=BH/2;
 const innerBot=new THREE.Mesh(new THREE.PlaneGeometry(W-.04,D-.04),new THREE.MeshStandardMaterial({color:'#3a0c18',roughness:.95}));innerBot.rotation.x=-Math.PI/2;innerBot.position.y=BH-.008;box.add(innerBot);
 const trimG=makeRoundBox(W+.008,.012,D+.008,.006);
 const trimMesh=new THREE.Mesh(trimG,metal);trimMesh.position.y=BH-.006;box.add(trimMesh);
-
-/* 丝绒垫（矮了）*/
 const padH=.06,slotW=.018,padGeo=makeRoundBox(W-.08,padH,(D-.08-slotW)/2,.02);
 for(const s of[-1,1]){const pad=new THREE.Mesh(padGeo,cushion);pad.position.set(0,BH-.005+padH/2,s*((D-.08-slotW)/4+slotW/2));pad.receiveShadow=true;box.add(pad)}
-
 const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
 const lid=new THREE.Mesh(makeRoundBox(W,LH,D,.06),velvet);lid.position.set(0,LH/2,D/2);lid.castShadow=true;hinge.add(lid);
-/* 金属边贴紧盖子底面，不突出 */
 const lidTrimMesh=new THREE.Mesh(trimG.clone(),metal);lidTrimMesh.position.set(0,.002,D/2);hinge.add(lidTrimMesh);
 
-/* ═══ 盖子内侧：凹框 + 奶白缎面布 ═══ */
+/* ═══ 盖子内侧：凹框 + 奶白缎面布（方向修正：朝下） ═══ */
 {
-  const recessW=W-.12,recessD=D-.12,recessDepth=.035;
-  /* 凹框底 */
-  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(recessW,recessD),new THREE.MeshStandardMaterial({color:'#2a0a14',roughness:.95}));
-  rBack.rotation.x=Math.PI/2;rBack.position.set(0,-recessDepth,D/2);hinge.add(rBack);
-  /* 凹框四壁 */
+  const rW=W-.12,rD=D-.12,rDepth=.035;
+  /* 凹框底面（在盖子内侧，y<0 朝下看） */
+  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(rW,rD),new THREE.MeshStandardMaterial({color:'#2a0a14',roughness:.95,side:THREE.DoubleSide}));
+  rBack.rotation.x=-Math.PI/2;
+  rBack.position.set(0,-(LH-rDepth),D/2);
+  hinge.add(rBack);
+  /* 四壁 */
   const wMat=new THREE.MeshStandardMaterial({color:'#35101c',roughness:.9,side:THREE.DoubleSide});
-  const wT=new THREE.Mesh(new THREE.PlaneGeometry(recessW,recessDepth),wMat);wT.position.set(0,-recessDepth/2,D/2-recessD/2);hinge.add(wT);
-  const wB=new THREE.Mesh(new THREE.PlaneGeometry(recessW,recessDepth),wMat);wB.rotation.y=Math.PI;wB.position.set(0,-recessDepth/2,D/2+recessD/2);hinge.add(wB);
-  const wL=new THREE.Mesh(new THREE.PlaneGeometry(recessD,recessDepth),wMat);wL.rotation.y=Math.PI/2;wL.position.set(-recessW/2,-recessDepth/2,D/2);hinge.add(wL);
-  const wR=new THREE.Mesh(new THREE.PlaneGeometry(recessD,recessDepth),wMat);wR.rotation.y=-Math.PI/2;wR.position.set(recessW/2,-recessDepth/2,D/2);hinge.add(wR);
+  /* 前壁（靠近你） */
+  const wF=new THREE.Mesh(new THREE.PlaneGeometry(rW,rDepth),wMat);
+  wF.position.set(0,-(LH-rDepth/2),D/2+rD/2);hinge.add(wF);
+  /* 后壁 */
+  const wB=new THREE.Mesh(new THREE.PlaneGeometry(rW,rDepth),wMat);
+  wB.position.set(0,-(LH-rDepth/2),D/2-rD/2);hinge.add(wB);
+  /* 左壁 */
+  const wL=new THREE.Mesh(new THREE.PlaneGeometry(rD,rDepth),wMat);
+  wL.rotation.y=Math.PI/2;
+  wL.position.set(-rW/2,-(LH-rDepth/2),D/2);hinge.add(wL);
+  /* 右壁 */
+  const wR=new THREE.Mesh(new THREE.PlaneGeometry(rD,rDepth),wMat);
+  wR.rotation.y=-Math.PI/2;
+  wR.position.set(rW/2,-(LH-rDepth/2),D/2);hinge.add(wR);
 
-  /* 奶白缎面布（比凹框小一圈留边距）*/
-  const clothW=recessW-.18,clothD=recessD-.14;
+  /* 奶白缎面布 */
+  const cW=rW-.18,cD=rD-.14;
   const cv=document.createElement('canvas');cv.width=1024;cv.height=800;
   const x=cv.getContext('2d');
-  /* 奶白暖底 */
   const gr=x.createRadialGradient(512,380,40,512,400,600);
   gr.addColorStop(0,'#faf6f0');gr.addColorStop(1,'#ede4d8');
   x.fillStyle=gr;x.fillRect(0,0,1024,800);
   x.textAlign='center';x.textBaseline='middle';
-  /* 烫金渐变 */
   const gd=x.createLinearGradient(280,0,744,0);
   gd.addColorStop(0,'#8a6428');gd.addColorStop(.5,'#d4a84a');gd.addColorStop(1,'#8a6428');
   x.fillStyle=gd;
@@ -119,13 +125,13 @@ const lidTrimMesh=new THREE.Mesh(trimG.clone(),metal);lidTrimMesh.position.set(0
   x.font='400 38px Georgia,serif';x.fillText('\u2014  since 2026.7.3  \u2014',512,440);
   x.font='400 30px Georgia,serif';x.fillText('100 days',512,510);
   const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
-  const clothMesh=new THREE.Mesh(
-    new THREE.PlaneGeometry(clothW,clothD),
-    new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0')})
+  const cloth=new THREE.Mesh(
+    new THREE.PlaneGeometry(cW,cD),
+    new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0'),side:THREE.DoubleSide})
   );
-  clothMesh.rotation.x=Math.PI/2;
-  clothMesh.position.set(0,-recessDepth+.003,D/2);
-  hinge.add(clothMesh);
+  cloth.rotation.x=-Math.PI/2;
+  cloth.position.set(0,-(LH-rDepth)+.003,D/2);
+  hinge.add(cloth);
 }
 
 const ring=buildRing();scene.add(ring);
