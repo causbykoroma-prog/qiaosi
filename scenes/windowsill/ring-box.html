@@ -51,11 +51,9 @@ function buildRing(){
   const hd=new THREE.Mesh(new THREE.CylinderGeometry(.026,.014,.04,24,1,true),metal);hd.position.y=R+TUBE*.78+.012;rg.add(hd);
   for(let i=0;i<6;i++){const a=i/6*Math.PI*2,c=Math.cos(a),s=Math.sin(a),cv=new THREE.CatmullRomCurve3([new THREE.Vector3(c*.016,R+TUBE*.6,s*.016),new THREE.Vector3(c*.042,G-.03,s*.042),new THREE.Vector3(c*(GR+.004),G+.002,s*(GR+.004)),new THREE.Vector3(c*(GR-.01),G+GR*.3,s*(GR-.01))]);rg.add(new THREE.Mesh(new THREE.TubeGeometry(cv,24,.0055,8),metal));const tp=new THREE.Mesh(new THREE.SphereGeometry(.0075,12,8),metal);tp.position.copy(cv.getPoint(1));rg.add(tp)}
   for(const sd of[1,-1])for(let k=0;k<9;k++){const th=Math.PI/2+sd*(.12+k*.072),f=thick(th),rO=R+TUBE*.78*f,n=new THREE.Vector3(Math.cos(th),Math.sin(th),0),sz=.0115*(1-k*.045);const st=new THREE.Mesh(brill(sz,8),dMat);st.position.copy(n).multiplyScalar(rO+sz*.05);st.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),n);rg.add(st);for(const zz of[-1,1]){const b=new THREE.Mesh(new THREE.SphereGeometry(.0042,10,6),metal);const t2=th+sd*.036;b.position.set(Math.cos(t2)*(rO+.002),Math.sin(t2)*(rO+.002),zz*.012*f);rg.add(b)}}
-
   const TXT='Fufu  \u2661  K  \u00b7  2026.7.3';
   const cvs=document.createElement('canvas');cvs.width=2048;cvs.height=128;
-  const cx=cvs.getContext('2d');
-  cx.fillStyle='#2a2a2a';cx.fillRect(0,0,2048,128);
+  const cx=cvs.getContext('2d');cx.fillStyle='#2a2a2a';cx.fillRect(0,0,2048,128);
   cx.font='700 78px Georgia,"Times New Roman",serif';cx.textAlign='center';cx.textBaseline='middle';
   for(const u of[.25,.75]){cx.fillStyle='#555';cx.fillText(TXT,2048*u+1,66);cx.fillStyle='#ffffff';cx.fillText(TXT,2048*u,64)}
   const tx=new THREE.CanvasTexture(cvs);tx.colorSpace=THREE.SRGBColorSpace;tx.anisotropy=8;tx.wrapS=THREE.RepeatWrapping;tx.repeat.x=-1;
@@ -81,37 +79,44 @@ const trimG=makeRoundBox(W+.008,.012,D+.008,.006);
 const trimMesh=new THREE.Mesh(trimG,metal);trimMesh.position.y=BH-.006;box.add(trimMesh);
 const padH=.06,slotW=.018,padGeo=makeRoundBox(W-.08,padH,(D-.08-slotW)/2,.02);
 for(const s of[-1,1]){const pad=new THREE.Mesh(padGeo,cushion);pad.position.set(0,BH-.005+padH/2,s*((D-.08-slotW)/4+slotW/2));pad.receiveShadow=true;box.add(pad)}
+
+/* ═══ 盖子 ═══ 
+   hinge 在盒身顶部后边缘，盖子的 lid mesh 中心在 (0, LH/2, D/2)
+   盖子内侧 = lid 的 y=0 那一面（铰链坐标系里朝下）
+   凹进去 = 在 lid 内侧放一个小一号的薄片当"边框"，中间留空放布 */
 const hinge=new THREE.Group();hinge.position.set(0,BH,-D/2);box.add(hinge);
 const lid=new THREE.Mesh(makeRoundBox(W,LH,D,.06),velvet);lid.position.set(0,LH/2,D/2);lid.castShadow=true;hinge.add(lid);
 const lidTrimMesh=new THREE.Mesh(trimG.clone(),metal);lidTrimMesh.position.set(0,.002,D/2);hinge.add(lidTrimMesh);
 
-/* ═══ 盖子内侧：凹框 + 奶白缎面布（方向修正：朝下） ═══ */
+/* 盖子内凹：边框(丝绒) + 凹底(深色) + 布(奶白) */
 {
-  const rW=W-.12,rD=D-.12,rDepth=.035;
-  /* 凹框底面（在盖子内侧，y<0 朝下看） */
-  const rBack=new THREE.Mesh(new THREE.PlaneGeometry(rW,rD),new THREE.MeshStandardMaterial({color:'#2a0a14',roughness:.95,side:THREE.DoubleSide}));
-  rBack.rotation.x=-Math.PI/2;
-  rBack.position.set(0,-(LH-rDepth),D/2);
+  const margin=.06;  /* 边框宽度 */
+  const inW=W-margin*2, inD=D-margin*2, depth=.05;
+  /* 边框：一个薄片贴在lid底面，中间挖不了洞就用深色底遮 */
+  /* 深色凹底 - 贴在 lid 底面再往里凹 depth */
+  const rBack=new THREE.Mesh(
+    new THREE.PlaneGeometry(inW,inD),
+    new THREE.MeshStandardMaterial({color:'#2a0a14',roughness:.95,side:THREE.DoubleSide})
+  );
+  rBack.rotation.x=Math.PI/2;  /* 面朝下 */
+  rBack.position.set(0, depth, D/2);  /* lid底面是y=0，往上depth就是凹进去 */
   hinge.add(rBack);
-  /* 四壁 */
-  const wMat=new THREE.MeshStandardMaterial({color:'#35101c',roughness:.9,side:THREE.DoubleSide});
-  /* 前壁（靠近你） */
-  const wF=new THREE.Mesh(new THREE.PlaneGeometry(rW,rDepth),wMat);
-  wF.position.set(0,-(LH-rDepth/2),D/2+rD/2);hinge.add(wF);
-  /* 后壁 */
-  const wB=new THREE.Mesh(new THREE.PlaneGeometry(rW,rDepth),wMat);
-  wB.position.set(0,-(LH-rDepth/2),D/2-rD/2);hinge.add(wB);
-  /* 左壁 */
-  const wL=new THREE.Mesh(new THREE.PlaneGeometry(rD,rDepth),wMat);
-  wL.rotation.y=Math.PI/2;
-  wL.position.set(-rW/2,-(LH-rDepth/2),D/2);hinge.add(wL);
-  /* 右壁 */
-  const wR=new THREE.Mesh(new THREE.PlaneGeometry(rD,rDepth),wMat);
-  wR.rotation.y=-Math.PI/2;
-  wR.position.set(rW/2,-(LH-rDepth/2),D/2);hinge.add(wR);
 
-  /* 奶白缎面布 */
-  const cW=rW-.18,cD=rD-.14;
+  /* 四条边框侧壁（从lid底面到凹底之间的深度） */
+  const wMat=new THREE.MeshStandardMaterial({color:'#35101c',roughness:.9,side:THREE.DoubleSide});
+  /* 前后 */
+  const wF=new THREE.Mesh(new THREE.PlaneGeometry(inW,depth),wMat);
+  wF.position.set(0,depth/2,D/2+inD/2);hinge.add(wF);
+  const wBk=new THREE.Mesh(new THREE.PlaneGeometry(inW,depth),wMat);
+  wBk.rotation.y=Math.PI;wBk.position.set(0,depth/2,D/2-inD/2);hinge.add(wBk);
+  /* 左右 */
+  const wL=new THREE.Mesh(new THREE.PlaneGeometry(inD,depth),wMat);
+  wL.rotation.y=Math.PI/2;wL.position.set(-inW/2,depth/2,D/2);hinge.add(wL);
+  const wR=new THREE.Mesh(new THREE.PlaneGeometry(inD,depth),wMat);
+  wR.rotation.y=-Math.PI/2;wR.position.set(inW/2,depth/2,D/2);hinge.add(wR);
+
+  /* 奶白缎面布（比凹区域再小一圈） */
+  const cW=inW-.16, cD=inD-.12;
   const cv=document.createElement('canvas');cv.width=1024;cv.height=800;
   const x=cv.getContext('2d');
   const gr=x.createRadialGradient(512,380,40,512,400,600);
@@ -129,8 +134,8 @@ const lidTrimMesh=new THREE.Mesh(trimG.clone(),metal);lidTrimMesh.position.set(0
     new THREE.PlaneGeometry(cW,cD),
     new THREE.MeshPhysicalMaterial({map:t,roughness:.3,sheen:.8,sheenColor:new THREE.Color('#fff8f0'),side:THREE.DoubleSide})
   );
-  cloth.rotation.x=-Math.PI/2;
-  cloth.position.set(0,-(LH-rDepth)+.003,D/2);
+  cloth.rotation.x=Math.PI/2;
+  cloth.position.set(0, depth+.002, D/2);
   hinge.add(cloth);
 }
 
