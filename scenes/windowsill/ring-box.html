@@ -47,12 +47,12 @@ function buildRing(){
   for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),th=Math.atan2(y,x),f=thick(th),cx=Math.cos(th)*R,cy=Math.sin(th)*R,rad=(x-cx)*Math.cos(th)+(y-cy)*Math.sin(th);p.setXYZ(i,cx+Math.cos(th)*rad*.78*f,cy+Math.sin(th)*rad*.78*f,z*1.25*f)}
   g.computeVertexNormals();const band=new THREE.Mesh(g,metal);band.castShadow=true;rg.add(band);
   const GR=.058,G=R+TUBE*.78+.052;
-  rg.add(Object.assign(new THREE.Mesh(brill(GR,16),dMat),{position:new THREE.Vector3(0,G,0)}));
+  const stone=new THREE.Mesh(brill(GR,16),dMat);stone.position.y=G;rg.add(stone);
   const hd=new THREE.Mesh(new THREE.CylinderGeometry(.026,.014,.04,24,1,true),metal);hd.position.y=R+TUBE*.78+.012;rg.add(hd);
   for(let i=0;i<6;i++){const a=i/6*Math.PI*2,c=Math.cos(a),s=Math.sin(a),cv=new THREE.CatmullRomCurve3([new THREE.Vector3(c*.016,R+TUBE*.6,s*.016),new THREE.Vector3(c*.042,G-.03,s*.042),new THREE.Vector3(c*(GR+.004),G+.002,s*(GR+.004)),new THREE.Vector3(c*(GR-.01),G+GR*.3,s*(GR-.01))]);rg.add(new THREE.Mesh(new THREE.TubeGeometry(cv,24,.0055,8),metal));const tp=new THREE.Mesh(new THREE.SphereGeometry(.0075,12,8),metal);tp.position.copy(cv.getPoint(1));rg.add(tp)}
   for(const sd of[1,-1])for(let k=0;k<9;k++){const th=Math.PI/2+sd*(.12+k*.072),f=thick(th),rO=R+TUBE*.78*f,n=new THREE.Vector3(Math.cos(th),Math.sin(th),0),sz=.0115*(1-k*.045);const st=new THREE.Mesh(brill(sz,8),dMat);st.position.copy(n).multiplyScalar(rO+sz*.05);st.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),n);rg.add(st);for(const zz of[-1,1]){const b=new THREE.Mesh(new THREE.SphereGeometry(.0042,10,6),metal);const t2=th+sd*.036;b.position.set(Math.cos(t2)*(rO+.002),Math.sin(t2)*(rO+.002),zz*.012*f);rg.add(b)}}
 
-  /* 内侧刻字：深色底+亮白字+自发光，任何角度都清晰 */
+  /* 内侧刻字：深底+亮白字+自发光 */
   const TXT='Fufu  \u2661  K  \u00b7  2026.7.3';
   const cvs=document.createElement('canvas');cvs.width=2048;cvs.height=128;
   const cx=cvs.getContext('2d');
@@ -63,7 +63,6 @@ function buildRing(){
     cx.fillStyle='#ffffff';cx.fillText(TXT,2048*u,64);
   }
   const tx=new THREE.CanvasTexture(cvs);tx.colorSpace=THREE.SRGBColorSpace;tx.anisotropy=8;tx.wrapS=THREE.RepeatWrapping;tx.repeat.x=-1;
-  /* 同时用贴图做 emissiveMap，字自己会发光，不靠外部灯 */
   const engraveTex=tx.clone();engraveTex.wrapS=THREE.RepeatWrapping;engraveTex.repeat.x=-1;
   const ig=new THREE.CylinderGeometry(R,R,.032,256,1,true);ig.rotateX(Math.PI/2);
   const ip=ig.attributes.position;
