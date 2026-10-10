@@ -19,11 +19,11 @@ f.addEventListener('load', () => {
     if (!w || !w.fuyue) { setTimeout(tryInject, 500); return; }
 
     // ── 在一起的天数 ──
-    const start = new Date(2026, 6, 3); // 7月3日（月份从0开始）
+    const start = new Date(2026, 6, 3);
     const now = new Date();
     const days = Math.floor((now - start) / (1000 * 60 * 60 * 24));
-    // 挂历上的月份和天数需要直接改贴图，但挂历没有单独的API
-    // 所以我们用 setSpace 把天数写在风铃纸笺上
+    const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+    const monthStr = monthNames[now.getMonth()];
 
     // ── 便签：碎碎念 ──
     w.fuyue.setNotes([
@@ -44,9 +44,49 @@ f.addEventListener('load', () => {
       }
     } catch(e){}
 
+    // ── 挂历：重画贴图 ──
+    try {
+      const fy = w.__fy;
+      if (fy) {
+        const calObj = fy.obj('cal');
+        if (calObj) {
+          calObj.traverse(o => {
+            if (o.isMesh && o.material && o.material.map && o.material.map.image) {
+              const img = o.material.map.image;
+              if (img.width === 240 && img.height === 320) {
+                const x = img.getContext('2d');
+                // 清掉重画
+                x.fillStyle = '#ece5d8'; x.fillRect(0, 0, 240, 320);
+                // 噪点
+                for (let i = 0; i < 900; i++) {
+                  const cols = ['rgba(140,120,96,0.03)', 'rgba(140,120,96,0.05)'];
+                  x.fillStyle = cols[Math.random() * 2 | 0];
+                  x.fillRect(Math.random() * 240, Math.random() * 320, 1 + Math.random() * 2, 1 + Math.random() * 2);
+                }
+                // 顶部色条
+                x.fillStyle = '#6e4a40'; x.fillRect(0, 0, 240, 34);
+                x.fillStyle = '#efe7da'; x.font = '500 18px system-ui, "Noto Sans CJK SC", sans-serif'; x.textAlign = 'center';
+                x.fillText(monthStr, 120, 24);
+                // 天数大字
+                x.fillStyle = '#2f2b28'; x.font = '600 96px "Noto Serif CJK SC", serif';
+                x.fillText(String(days), 120, 170);
+                // 副标题
+                x.fillStyle = '#6f6862'; x.font = '400 22px system-ui, "Noto Sans CJK SC", sans-serif';
+                x.fillText('在一起 · 天', 120, 214);
+                // 横线
+                x.strokeStyle = '#cfc6b6'; x.lineWidth = 1;
+                for (let i = 0; i < 3; i++) { x.beginPath(); x.moveTo(36, 248 + i * 22); x.lineTo(204, 248 + i * 22); x.stroke(); }
+                o.material.map.needsUpdate = true;
+              }
+            }
+          });
+        }
+      }
+    } catch(e){ console.log('挂历重画失败', e); }
+
     console.log('窗台初始化完成 ♡ 在一起第' + days + '天');
   };
-  setTimeout(tryInject, 2500);
+  setTimeout(tryInject, 3000);
 });
 </script>
 </body>
